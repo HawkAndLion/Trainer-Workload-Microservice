@@ -1,5 +1,6 @@
 package com.epam.trainer_workload_service.security;
 
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
@@ -16,20 +17,19 @@ public class JwtTokenProvider {
     private static final Logger LOG = LoggerFactory.getLogger(JwtTokenProvider.class);
     private static final String ERROR_MESSAGE = "Invalid or expired JWT={} ";
 
-    @Value("${security.jwt.secret}")
+    @Value("${jwt.secret}")
     private String jwtSecret;
 
     private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtSecret));
     }
 
-    public String getUsernameFromToken(String token) {
+    public Claims getClaims(String token) {
         return Jwts.parser()
                 .verifyWith(getSigningKey())
                 .build()
                 .parseSignedClaims(token)
-                .getPayload()
-                .getSubject();
+                .getPayload();
     }
 
     public boolean validateToken(String token) {
