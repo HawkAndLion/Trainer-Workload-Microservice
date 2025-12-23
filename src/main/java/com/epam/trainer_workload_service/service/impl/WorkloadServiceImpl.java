@@ -24,6 +24,10 @@ public class WorkloadServiceImpl implements WorkloadService {
     private static final String NULL_USERNAME = "Username must not be null";
     private static final String NULL_TRAINING_DATE = "Training date must not be null";
     private static final String NULL_ACTION_TYPE = "Action type must not be null";
+    private static final String DUPLICATE_ADD = "Duplicate ADD ignored for trainingId={}";
+    private static final String ADD_PROCESSED = "ADD processed trainingId={}, minutes={}";
+    private static final String TRAINING_NOT_FOUND = "Training not found: ";
+    private static final String DELETE_PROCESSED = "DELETE processed trainingId={}";
 
     private final TrainerMonthlyWorkloadRepository workloadRepository;
     private final TrainingEventRecordRepository eventRepository;
@@ -51,10 +55,37 @@ public class WorkloadServiceImpl implements WorkloadService {
         }
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public TrainingSummaryDto getSummaryForTrainer(String username, int year, int month)
+            throws ServiceException {
+
+        if (username != null) {
+            List<TrainerMonthlyWorkload> records = workloadRepository.findByUsername(username);
+
+            if (records.isEmpty()) {
+                return new TrainingSummaryDto(username, null, null, false, Collections.emptyList());
+            }
+
+            TrainerMonthlyWorkload base = records.get(0);
+
+            return new TrainingSummaryDto(
+                    base.getUsername(),
+                    base.getFirstName(),
+                    base.getLastName(),
+                    base.isActive(),
+                    buildYearSummaries(records)
+            );
+        } else {
+            throw new ServiceException(NULL_USERNAME);
+        }
+    }
+
     private void handleAdd(TrainingEventDto dto, int year, int month, long minutes) {
 
         if (eventRepository.existsByTrainingId(dto.getTrainingId())) {
-            log.info("Duplicate ADD ignored for trainingId={}", dto.getTrainingId());
+            log.info(DUPLICATE_ADD, dto.getTrainingId());
+
             return;
         }
 
@@ -66,9 +97,10 @@ public class WorkloadServiceImpl implements WorkloadService {
         );
 
         eventRepository.save(record);
+
         upsertMonthlyWorkload(dto, year, month, minutes);
 
-        log.info("ADD processed trainingId={}, minutes={}", dto.getTrainingId(), minutes);
+        log.info(ADD_PROCESSED, dto.getTrainingId(), minutes);
     }
 
     private void handleDelete(TrainingEventDto dto, int year, int month) {
@@ -76,13 +108,13 @@ public class WorkloadServiceImpl implements WorkloadService {
         TrainingEventRecord record = eventRepository
                 .findByTrainingId(dto.getTrainingId())
                 .orElseThrow(() ->
-                        new IllegalArgumentException("Training not found: " + dto.getTrainingId())
+                        new IllegalArgumentException(TRAINING_NOT_FOUND + dto.getTrainingId())
                 );
 
         eventRepository.delete(record);
         upsertMonthlyWorkload(dto, year, month, -record.getDurationMinutes());
 
-        log.info("DELETE processed trainingId={}", dto.getTrainingId());
+        log.info(DELETE_PROCESSED, dto.getTrainingId());
     }
 
     private void upsertMonthlyWorkload(
@@ -113,42 +145,19 @@ public class WorkloadServiceImpl implements WorkloadService {
         workloadRepository.save(workload);
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public TrainingSummaryDto getSummaryForTrainer(String username, int year, int month)
-            throws ServiceException {
-
-        if (username == null) {
-            throw new ServiceException("Username must not be null");
-        }
-
-        List<TrainerMonthlyWorkload> records = workloadRepository.findByUsername(username);
-
-        if (records.isEmpty()) {
-            return new TrainingSummaryDto(username, null, null, false, Collections.emptyList());
-        }
-
-        TrainerMonthlyWorkload base = records.get(0);
-
-        return new TrainingSummaryDto(
-                base.getUsername(),
-                base.getFirstName(),
-                base.getLastName(),
-                base.isActive(),
-                buildYearSummaries(records)
-        );
-    }
-
     private void validateDto(TrainingEventDto dto) {
         if (dto == null) {
             throw new IllegalArgumentException(NULL_DTO);
         }
+
         if (dto.getUsername() == null) {
             throw new IllegalArgumentException(NULL_USERNAME);
         }
+
         if (dto.getTrainingDate() == null) {
             throw new IllegalArgumentException(NULL_TRAINING_DATE);
         }
+
         if (dto.getActionType() == null) {
             throw new IllegalArgumentException(NULL_ACTION_TYPE);
         }
@@ -174,6 +183,7 @@ public class WorkloadServiceImpl implements WorkloadService {
         }
 
         years.sort(Comparator.comparingInt(YearSummaryDto::getYear));
+
         return years;
     }
 }
