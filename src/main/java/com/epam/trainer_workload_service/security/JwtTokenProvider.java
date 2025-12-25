@@ -32,6 +32,15 @@ public class JwtTokenProvider {
                 .getPayload();
     }
 
+    public String getUsernameFromToken(String token) {
+        return Jwts.parser()
+                .verifyWith(getSigningKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload()
+                .getSubject();
+    }
+
     public boolean validateToken(String token) {
         try {
             Jwts.parser()
