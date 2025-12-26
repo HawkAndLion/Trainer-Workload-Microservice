@@ -1,8 +1,11 @@
 package com.epam.trainer_workload_service.service.impl;
 
-import com.epam.trainer_workload_service.dto.*;
+import com.epam.trainer_workload_service.dto.ActionType;
+import com.epam.trainer_workload_service.dto.TrainingEventDto;
+import com.epam.trainer_workload_service.dto.TrainingSummaryDto;
 import com.epam.trainer_workload_service.entity.TrainerMonthlyWorkload;
 import com.epam.trainer_workload_service.entity.TrainingEventRecord;
+import com.epam.trainer_workload_service.mapper.WorkloadMapper;
 import com.epam.trainer_workload_service.repository.TrainerMonthlyWorkloadRepository;
 import com.epam.trainer_workload_service.repository.TrainingEventRecordRepository;
 import com.epam.trainer_workload_service.service.ServiceException;
@@ -12,8 +15,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.Collections;
+import java.util.List;
 
 @Service
 public class WorkloadServiceImpl implements WorkloadService {
@@ -31,11 +34,13 @@ public class WorkloadServiceImpl implements WorkloadService {
 
     private final TrainerMonthlyWorkloadRepository workloadRepository;
     private final TrainingEventRecordRepository eventRepository;
+    private final WorkloadMapper workloadMapper;
 
     public WorkloadServiceImpl(TrainerMonthlyWorkloadRepository workloadRepository,
-                               TrainingEventRecordRepository eventRepository) {
+                               TrainingEventRecordRepository eventRepository, WorkloadMapper workloadMapper) {
         this.workloadRepository = workloadRepository;
         this.eventRepository = eventRepository;
+        this.workloadMapper = workloadMapper;
     }
 
     @Transactional
@@ -67,15 +72,7 @@ public class WorkloadServiceImpl implements WorkloadService {
                 return new TrainingSummaryDto(username, null, null, false, Collections.emptyList());
             }
 
-            TrainerMonthlyWorkload base = records.get(0);
-
-            return new TrainingSummaryDto(
-                    base.getUsername(),
-                    base.getFirstName(),
-                    base.getLastName(),
-                    base.isActive(),
-                    buildYearSummaries(records)
-            );
+            return workloadMapper.toTrainingSummary(username, records);
         } else {
             throw new ServiceException(NULL_USERNAME);
         }
@@ -161,29 +158,5 @@ public class WorkloadServiceImpl implements WorkloadService {
         if (dto.getActionType() == null) {
             throw new IllegalArgumentException(NULL_ACTION_TYPE);
         }
-    }
-
-    private static List<YearSummaryDto> buildYearSummaries(
-            List<TrainerMonthlyWorkload> records) {
-
-        Map<Integer, List<TrainerMonthlyWorkload>> byYear =
-                records.stream().collect(Collectors.groupingBy(
-                        TrainerMonthlyWorkload::getYear
-                ));
-
-        List<YearSummaryDto> years = new ArrayList<>();
-
-        for (Map.Entry<Integer, List<TrainerMonthlyWorkload>> entry : byYear.entrySet()) {
-            List<MonthSummaryDto> months = entry.getValue().stream()
-                    .map(w -> new MonthSummaryDto(w.getMonth(), w.getTotalMinutes()))
-                    .sorted(Comparator.comparing(MonthSummaryDto::getMonth))
-                    .toList();
-
-            years.add(new YearSummaryDto(entry.getKey(), months));
-        }
-
-        years.sort(Comparator.comparingInt(YearSummaryDto::getYear));
-
-        return years;
     }
 }
