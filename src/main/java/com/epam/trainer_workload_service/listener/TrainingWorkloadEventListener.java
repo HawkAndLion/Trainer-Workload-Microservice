@@ -21,7 +21,7 @@ public class TrainingWorkloadEventListener {
     private static final String RECEIVED_TRAINING_EVENT = "RECEIVED training event: {}";
     private static final String AUTHORIZATION = "Authorization";
     private static final String BEARER = "Bearer ";
-    //    private static final String BEARER = "Bearerer"; //for testing DLQ
+//        private static final String BEARER = "Bearerer"; //for testing DLQ
     private static final Integer SEVEN = 7;
     private static final String INVALID_JWT_TOKEN = "Invalid JWT token";
     private static final String UNAUTHORIZED_MESSAGE = "Unauthorized service: ";

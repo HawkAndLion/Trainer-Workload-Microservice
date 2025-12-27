@@ -31,6 +31,7 @@ public class WorkloadServiceImpl implements WorkloadService {
     private static final String ADD_PROCESSED = "ADD processed trainingId={}, minutes={}";
     private static final String TRAINING_NOT_FOUND = "Training not found: ";
     private static final String DELETE_PROCESSED = "DELETE processed trainingId={}";
+    private static final String NEGATIVE_DURATION_MINUTES = "DurationMinutes must be non-negative";
 
     private final TrainerMonthlyWorkloadRepository workloadRepository;
     private final TrainingEventRecordRepository eventRepository;
@@ -157,6 +158,10 @@ public class WorkloadServiceImpl implements WorkloadService {
 
         if (dto.getActionType() == null) {
             throw new IllegalArgumentException(NULL_ACTION_TYPE);
+        }
+
+        if (dto.getDurationMinutes() < 0) {
+            throw new IllegalArgumentException(NEGATIVE_DURATION_MINUTES);
         }
     }
 }
