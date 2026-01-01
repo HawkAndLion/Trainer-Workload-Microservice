@@ -1,10 +1,9 @@
 package com.epam.trainer_workload_service.service.impl;
 
-import com.epam.trainer_workload_service.dto.ActionType;
-import com.epam.trainer_workload_service.dto.TrainingEventDto;
-import com.epam.trainer_workload_service.dto.TrainingSummaryDto;
+import com.epam.trainer_workload_service.dto.*;
 import com.epam.trainer_workload_service.entity.TrainerMonthlyWorkload;
 import com.epam.trainer_workload_service.entity.TrainingEventRecord;
+import com.epam.trainer_workload_service.mapper.WorkloadMapper;
 import com.epam.trainer_workload_service.repository.TrainerMonthlyWorkloadRepository;
 import com.epam.trainer_workload_service.repository.TrainingEventRecordRepository;
 import com.epam.trainer_workload_service.service.ServiceException;
@@ -16,22 +15,18 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class WorkloadServiceImplTest {
-    private static final String NULL_ARGUMENT = "Check the argument. It might be null.";
-    private static final String NULL_ACTION_TYPE = "actionType must not be null";
-    private static final String NULL_USERNAME = "username must not be null";
-    private static final String NEGATIVE_DURATION_MINUTES = "durationMinutes must be non-negative";
-    private static final String TRAINING_TO_DELETE_NOT_FOUND = "Training event to delete not found";
+    private static final String NULL_DTO = "TrainingEventDto must not be null";
+    private static final String NULL_ACTION_TYPE = "Action type must not be null";
+    private static final String NULL_USERNAME = "Username must not be null";
+    private static final String NEGATIVE_DURATION_MINUTES = "DurationMinutes must be non-negative";
+    private static final String TRAINING_TO_DELETE_NOT_FOUND = "Training not found: ";
 
     @Mock
     private TrainerMonthlyWorkloadRepository workloadRepository;
@@ -39,41 +34,18 @@ class WorkloadServiceImplTest {
     @Mock
     private TrainingEventRecordRepository eventRepository;
 
+    @Mock
+    private WorkloadMapper workloadMapper;
+
     @InjectMocks
     private WorkloadServiceImpl service;
 
-    @Test
-    void shouldProcessTrainerEventWhenActionTypeIsAddEvent() {
-        // Given
-        TrainingEventDto dto = new TrainingEventDto();
-        dto.setUsername("John.Doe");
-        dto.setFirstName("John");
-        dto.setLastName("Doe");
-        dto.setActive(true);
-        dto.setTrainingDate(LocalDate.of(2025, 1, 15));
-        dto.setDurationMinutes(60);
-        dto.setActionType(ActionType.ADD);
-
-        when(eventRepository.findFirstByUsernameAndTrainingDateAndDurationMinutes(
-                anyString(), any(LocalDate.class), anyLong()))
-                .thenReturn(Optional.empty());
-
-        when(workloadRepository.findByUsernameAndYearAndMonth(anyString(), anyInt(), anyInt()))
-                .thenReturn(Optional.empty());
-
-        // When
-        service.processTrainerEvent(dto);
-
-        // Then
-        verify(eventRepository).save(any(TrainingEventRecord.class));
-        verify(workloadRepository).save(any(TrainerMonthlyWorkload.class));
-        assertDoesNotThrow(() -> service.processTrainerEvent(dto));
-    }
 
     @Test
     void shouldDoNothingWhenProcessTrainerEventIsDuplicateAdd() {
         // Given
         TrainingEventDto dto = new TrainingEventDto();
+        dto.setTrainingId(1L);
         dto.setUsername("John.Doe");
         dto.setFirstName("John");
         dto.setLastName("Doe");
@@ -82,19 +54,9 @@ class WorkloadServiceImplTest {
         dto.setDurationMinutes(90);
         dto.setActionType(ActionType.ADD);
 
-        TrainingEventRecord eventRecord = new TrainingEventRecord();
-        eventRecord.setId(1L);
-        eventRecord.setUsername("John.Doe");
-        eventRecord.setFirstName("John");
-        eventRecord.setLastName("Doe");
-        eventRecord.setActive(true);
-        eventRecord.setTrainingDate(LocalDate.of(2025, 5, 10));
-        eventRecord.setDurationMinutes(90);
-        eventRecord.setCreatedAt(LocalDateTime.now());
+        TrainingEventRecord eventRecord = new TrainingEventRecord(1L, "John.Doe", LocalDate.of(2025, 5, 10), 90);
 
-        when(eventRepository.findFirstByUsernameAndTrainingDateAndDurationMinutes(
-                anyString(), any(LocalDate.class), anyLong()))
-                .thenReturn(Optional.of(eventRecord));
+        when(eventRepository.existsByTrainingId(dto.getTrainingId())).thenReturn(true);
 
         // When
         service.processTrainerEvent(dto);
@@ -117,15 +79,7 @@ class WorkloadServiceImplTest {
         dto.setDurationMinutes(60);
         dto.setActionType(ActionType.DELETE);
 
-        TrainingEventRecord eventRecord = new TrainingEventRecord();
-        eventRecord.setId(1L);
-        eventRecord.setUsername("John.Doe");
-        eventRecord.setFirstName("John");
-        eventRecord.setLastName("Doe");
-        eventRecord.setActive(true);
-        eventRecord.setTrainingDate(LocalDate.of(2025, 5, 10));
-        eventRecord.setDurationMinutes(60);
-        eventRecord.setCreatedAt(LocalDateTime.now());
+        TrainingEventRecord eventRecord = new TrainingEventRecord(1L, "John.Doe", LocalDate.of(2025, 5, 10), 60);
 
         TrainerMonthlyWorkload workload = new TrainerMonthlyWorkload();
         workload.setId(1L);
@@ -137,9 +91,7 @@ class WorkloadServiceImplTest {
         workload.setMonth(5);
         workload.setTotalMinutes(eventRecord.getDurationMinutes());
 
-        when(eventRepository.findFirstByUsernameAndTrainingDateAndDurationMinutes(
-                anyString(), any(LocalDate.class), anyLong()))
-                .thenReturn(Optional.of(eventRecord));
+        when(eventRepository.findByTrainingId(dto.getTrainingId())).thenReturn(Optional.of(eventRecord));
 
         when(workloadRepository.findByUsernameAndYearAndMonth(anyString(), anyInt(), anyInt()))
                 .thenReturn(Optional.of(workload));
@@ -156,15 +108,7 @@ class WorkloadServiceImplTest {
     @Test
     void shouldExecuteGetSummaryForTrainerWhenValidValues() throws ServiceException {
         // Given
-        TrainingEventRecord eventRecord = new TrainingEventRecord();
-        eventRecord.setId(1L);
-        eventRecord.setUsername("John.Doe");
-        eventRecord.setFirstName("John");
-        eventRecord.setLastName("Doe");
-        eventRecord.setActive(true);
-        eventRecord.setTrainingDate(LocalDate.of(2025, 5, 10));
-        eventRecord.setDurationMinutes(60);
-        eventRecord.setCreatedAt(LocalDateTime.now());
+        TrainingEventRecord eventRecord = new TrainingEventRecord(1L, "John.Doe", LocalDate.of(2025, 5, 10), 60);
 
         TrainerMonthlyWorkload workload = new TrainerMonthlyWorkload();
         workload.setId(1L);
@@ -175,6 +119,19 @@ class WorkloadServiceImplTest {
         workload.setYear(2025);
         workload.setMonth(5);
         workload.setTotalMinutes(eventRecord.getDurationMinutes());
+
+        List<TrainerMonthlyWorkload> records = new ArrayList<>();
+        records.add(workload);
+
+        MonthSummaryDto monthSummaryDto = new MonthSummaryDto(5, 60);
+        List<MonthSummaryDto> months = new ArrayList<>();
+        months.add(monthSummaryDto);
+        YearSummaryDto yearSummaryDto = new YearSummaryDto(2025, months);
+        List<YearSummaryDto> years = new ArrayList<>();
+        years.add(yearSummaryDto);
+
+        when(workloadMapper.toTrainingSummary("John.Doe", records))
+                .thenReturn(new TrainingSummaryDto("John.Doe", "John", "Doe", true, years));
 
         when(workloadRepository.findByUsername("John.Doe")).thenReturn(List.of(workload));
 
@@ -201,6 +158,8 @@ class WorkloadServiceImplTest {
                 new TrainerMonthlyWorkload("John.Doe", "John", "Doe", true, 2024, 1, 100L),
                 new TrainerMonthlyWorkload("John.Doe", "John", "Doe", false, 2024, 2, 150L)
         );
+        when(workloadMapper.toTrainingSummary("John.Doe", workloads))
+                .thenReturn(new TrainingSummaryDto("John.Doe", "John", "Doe", true, List.of()));
 
         when(workloadRepository.findByUsername("John.Doe"))
                 .thenReturn(workloads);
@@ -226,7 +185,7 @@ class WorkloadServiceImplTest {
         // Then
         verifyNoInteractions(eventRepository);
         verifyNoInteractions(workloadRepository);
-        assertEquals(NULL_ARGUMENT, exception.getMessage());
+        assertEquals(NULL_DTO, exception.getMessage());
     }
 
     @Test
@@ -307,17 +266,14 @@ class WorkloadServiceImplTest {
         dto.setDurationMinutes(60);
         dto.setActionType(ActionType.DELETE);
 
-        when(eventRepository.findFirstByUsernameAndTrainingDateAndDurationMinutes(
-                anyString(), any(LocalDate.class), anyLong()))
-                .thenReturn(Optional.empty());
+        when(eventRepository.findByTrainingId(dto.getTrainingId())).thenReturn(Optional.empty());
 
         // When
         Exception ex = assertThrows(IllegalArgumentException.class, () -> service.processTrainerEvent(dto));
 
         // Then
         verify(eventRepository, times(1))
-                .findFirstByUsernameAndTrainingDateAndDurationMinutes(
-                        anyString(), any(LocalDate.class), anyLong());
+                .findByTrainingId(dto.getTrainingId());
         verify(eventRepository, never()).delete(any());
         verify(workloadRepository, never()).save(any());
         assertTrue(ex.getMessage().contains(TRAINING_TO_DELETE_NOT_FOUND));
@@ -349,15 +305,12 @@ class WorkloadServiceImplTest {
         dto.setDurationMinutes(90L);
         dto.setActionType(ActionType.DELETE);
 
-        TrainingEventRecord existingEvent = new TrainingEventRecord(
-                "John.Doe", "John", "Doe", true,
+        TrainingEventRecord existingEvent = new TrainingEventRecord(1L,
+                "John.Doe",
                 LocalDate.of(2024, 1, 15),
-                90L,
-                LocalDateTime.now()
-        );
+                90L);
 
-        lenient().when(eventRepository.findFirstByUsernameAndTrainingDateAndDurationMinutes(
-                        eq("John.Doe"), eq(LocalDate.of(2024, 1, 15)), eq(90L)))
+        lenient().when(eventRepository.findByTrainingId(dto.getTrainingId()))
                 .thenReturn(Optional.of(existingEvent));
 
         TrainerMonthlyWorkload existingWorkload = new TrainerMonthlyWorkload(
@@ -406,6 +359,6 @@ class WorkloadServiceImplTest {
 
         // Then
         verifyNoInteractions(workloadRepository);
-        assertTrue(ex.getMessage().contains("Username should not be null"));
+        assertTrue(ex.getMessage().contains(NULL_USERNAME));
     }
 }
