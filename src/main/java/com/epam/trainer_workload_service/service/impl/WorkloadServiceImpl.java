@@ -2,10 +2,10 @@ package com.epam.trainer_workload_service.service.impl;
 
 import com.epam.trainer_workload_service.dto.ActionType;
 import com.epam.trainer_workload_service.dto.TrainingEventDto;
-import com.epam.trainer_workload_service.dto.TrainingSummaryDto;
 import com.epam.trainer_workload_service.entity.TrainerMonthlyWorkload;
 import com.epam.trainer_workload_service.entity.TrainingEventRecord;
 import com.epam.trainer_workload_service.mapper.WorkloadMapper;
+import com.epam.trainer_workload_service.model.TrainingSummary;
 import com.epam.trainer_workload_service.repository.TrainerMonthlyWorkloadRepository;
 import com.epam.trainer_workload_service.repository.TrainingEventRecordRepository;
 import com.epam.trainer_workload_service.service.ServiceException;
@@ -15,7 +15,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -63,15 +62,11 @@ public class WorkloadServiceImpl implements WorkloadService {
 
     @Override
     @Transactional(readOnly = true)
-    public TrainingSummaryDto getSummaryForTrainer(String username, int year, int month)
+    public TrainingSummary getSummaryForTrainer(String username, int year, int month)
             throws ServiceException {
 
         if (username != null) {
             List<TrainerMonthlyWorkload> records = workloadRepository.findByUsername(username);
-
-            if (records.isEmpty()) {
-                return new TrainingSummaryDto(username, null, null, false, Collections.emptyList());
-            }
 
             return workloadMapper.toTrainingSummary(username, records);
         } else {

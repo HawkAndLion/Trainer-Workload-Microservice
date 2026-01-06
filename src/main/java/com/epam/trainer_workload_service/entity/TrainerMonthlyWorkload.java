@@ -26,7 +26,7 @@ public class TrainerMonthlyWorkload {
     private String lastName;
 
     @Column(name = "is_active")
-    private boolean isActive;
+    private boolean active;
 
     @Column(name = "workload_year", nullable = false)
     private int year;
@@ -42,7 +42,7 @@ public class TrainerMonthlyWorkload {
         this.username = username;
         this.firstName = firstName;
         this.lastName = lastName;
-        this.isActive = active;
+        this.active = active;
         this.year = year;
         this.month = month;
         this.totalMinutes = totalMinutes;

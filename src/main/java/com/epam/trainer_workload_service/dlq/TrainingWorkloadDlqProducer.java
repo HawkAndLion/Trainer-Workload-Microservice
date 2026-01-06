@@ -13,8 +13,14 @@ public class TrainingWorkloadDlqProducer {
     private final JmsTemplate jmsTemplate;
 
     public void sendToDlq(String dlq, TrainingEventDto dto, Exception exception) {
+
+        Long trainingId = null;
+        if (dto != null) {
+            trainingId = dto.getTrainingId();
+        }
+
         TrainingEventErrorDto errorDto = new TrainingEventErrorDto(
-                dto != null ? dto.getTrainingId() : null,
+                trainingId,
                 exception.getClass().getSimpleName(),
                 exception.getMessage()
         );

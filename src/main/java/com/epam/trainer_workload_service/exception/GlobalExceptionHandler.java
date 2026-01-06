@@ -1,18 +1,19 @@
 package com.epam.trainer_workload_service.exception;
 
+import com.epam.trainer_workload_service.model.ErrorResponse;
 import com.epam.trainer_workload_service.service.ServiceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.time.ZonedDateTime;
 import java.util.Map;
 
-@ControllerAdvice
+@RestControllerAdvice
 public class GlobalExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
     private static final String BAD_REQUEST = "Bad request. transactionId={}, message={}";
@@ -23,16 +24,14 @@ public class GlobalExceptionHandler {
     private static final String INTERNAL_SERVER_ERROR = "Internal server error";
 
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<Object> handleBadRequest(IllegalArgumentException ex) {
+    public ResponseEntity<ErrorResponse> handleBadRequest(IllegalArgumentException ex) {
         String tx = MDC.get(TRANSACTION_ID);
         log.warn(BAD_REQUEST, tx, ex.getMessage());
 
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of(
-                        TIMESTAMP, ZonedDateTime.now(),
-                        TRANSACTION_ID, tx,
-                        MESSAGE, ex.getMessage()
-                ));
+        ErrorResponse error = new ErrorResponse();
+        error.setError(ex.getMessage());
+
+        return ResponseEntity.badRequest().body(error);
     }
 
     @ExceptionHandler(ServiceException.class)
