@@ -2,20 +2,21 @@ package com.epam.trainer_workload_service.service.impl;
 
 import com.epam.trainer_workload_service.dto.ActionType;
 import com.epam.trainer_workload_service.dto.TrainingEventDto;
-import com.epam.trainer_workload_service.entity.TrainerMonthlyWorkload;
 import com.epam.trainer_workload_service.entity.TrainingEventRecord;
 import com.epam.trainer_workload_service.mapper.WorkloadMapper;
 import com.epam.trainer_workload_service.model.TrainingSummary;
-import com.epam.trainer_workload_service.repository.TrainerMonthlyWorkloadRepository;
+import com.epam.trainer_workload_service.mongo.MonthWorkload;
+import com.epam.trainer_workload_service.mongo.TrainerWorkloadDocument;
+import com.epam.trainer_workload_service.mongo.YearWorkload;
+import com.epam.trainer_workload_service.repository.TrainerWorkloadRepository;
 import com.epam.trainer_workload_service.repository.TrainingEventRecordRepository;
 import com.epam.trainer_workload_service.service.ServiceException;
 import com.epam.trainer_workload_service.service.WorkloadService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
+import java.util.ArrayList;
 
 @Service
 public class WorkloadServiceImpl implements WorkloadService {
@@ -31,19 +32,22 @@ public class WorkloadServiceImpl implements WorkloadService {
     private static final String TRAINING_NOT_FOUND = "Training not found: ";
     private static final String DELETE_PROCESSED = "DELETE processed trainingId={}";
     private static final String NEGATIVE_DURATION_MINUTES = "DurationMinutes must be non-negative";
+    private static final String NEGATIVE_WORKLOAD = "Workload cannot be negative for user=";
+    private static final String UPDATING_WORKLOAD_MESSAGE = "Updating workload: user={}, year={}, month={}, delta={}";
+    private static final String SAVE_DOC_TO_MONGODB = "Saving workload document to MongoDB for username={}";
+    private static final String TRAINER_NOT_FOUND = "Trainer not found: ";
 
-    private final TrainerMonthlyWorkloadRepository workloadRepository;
+    private final TrainerWorkloadRepository workloadRepository;
     private final TrainingEventRecordRepository eventRepository;
     private final WorkloadMapper workloadMapper;
 
-    public WorkloadServiceImpl(TrainerMonthlyWorkloadRepository workloadRepository,
-                               TrainingEventRecordRepository eventRepository, WorkloadMapper workloadMapper) {
+
+    public WorkloadServiceImpl(TrainerWorkloadRepository workloadRepository, TrainingEventRecordRepository eventRepository, WorkloadMapper workloadMapper) {
         this.workloadRepository = workloadRepository;
         this.eventRepository = eventRepository;
         this.workloadMapper = workloadMapper;
     }
 
-    @Transactional
     @Override
     public void processTrainerEvent(TrainingEventDto dto) {
 
@@ -61,14 +65,16 @@ public class WorkloadServiceImpl implements WorkloadService {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public TrainingSummary getSummaryForTrainer(String username, int year, int month)
             throws ServiceException {
 
         if (username != null) {
-            List<TrainerMonthlyWorkload> records = workloadRepository.findByUsername(username);
 
-            return workloadMapper.toTrainingSummary(username, records);
+            TrainerWorkloadDocument doc = workloadRepository
+                    .findByUsername(username)
+                    .orElseThrow(() -> new ServiceException(TRAINER_NOT_FOUND + username));
+
+            return workloadMapper.toTrainingSummary(doc, year, month);
         } else {
             throw new ServiceException(NULL_USERNAME);
         }
@@ -116,27 +122,48 @@ public class WorkloadServiceImpl implements WorkloadService {
             int month,
             long deltaMinutes
     ) {
-        TrainerMonthlyWorkload workload =
-                workloadRepository
-                        .findByUsernameAndYearAndMonth(dto.getUsername(), year, month)
-                        .orElseGet(() ->
-                                new TrainerMonthlyWorkload(
-                                        dto.getUsername(),
-                                        dto.getFirstName(),
-                                        dto.getLastName(),
-                                        dto.isActive(),
-                                        year,
-                                        month,
-                                        0L
-                                )
-                        );
-
-        workload.setTotalMinutes(
-                Math.max(0, workload.getTotalMinutes() + deltaMinutes)
+        log.debug(
+                UPDATING_WORKLOAD_MESSAGE,
+                dto.getUsername(), year, month, deltaMinutes
         );
 
-        workloadRepository.save(workload);
+        TrainerWorkloadDocument document =
+                workloadRepository.findByUsername(dto.getUsername())
+                        .orElseGet(() -> createNewTrainer(dto));
+
+        YearWorkload yearNode = document.getYears().stream()
+                .filter(y -> y.getYear() == year)
+                .findFirst()
+                .orElseGet(() -> {
+                    YearWorkload y = new YearWorkload(year, new ArrayList<>());
+                    document.getYears().add(y);
+                    return y;
+                });
+
+        MonthWorkload monthNode = yearNode.getMonths().stream()
+                .filter(m -> m.getMonth() == month)
+                .findFirst()
+                .orElseGet(() -> {
+                    MonthWorkload m = new MonthWorkload(month, 0L);
+                    yearNode.getMonths().add(m);
+                    return m;
+                });
+
+        long updated = monthNode.getTotalMinutes() + deltaMinutes;
+
+        if (updated < 0) {
+            throw new IllegalStateException(
+                    NEGATIVE_WORKLOAD + dto.getUsername()
+            );
+        }
+
+        monthNode.setTotalMinutes(updated);
+
+        log.info(SAVE_DOC_TO_MONGODB, document.getUsername());
+
+        workloadRepository.save(document);
     }
+
 
     private void validateDto(TrainingEventDto dto) {
         if (dto == null) {
@@ -155,8 +182,20 @@ public class WorkloadServiceImpl implements WorkloadService {
             throw new IllegalArgumentException(NULL_ACTION_TYPE);
         }
 
-        if (dto.getDurationMinutes() < 0) {
+        if (dto.getActionType() == ActionType.ADD && dto.getDurationMinutes() < 0) {
             throw new IllegalArgumentException(NEGATIVE_DURATION_MINUTES);
         }
+
+    }
+
+    private TrainerWorkloadDocument createNewTrainer(TrainingEventDto dto) {
+        TrainerWorkloadDocument doc = new TrainerWorkloadDocument();
+        doc.setUsername(dto.getUsername());
+        doc.setFirstName(dto.getFirstName());
+        doc.setLastName(dto.getLastName());
+        doc.setActive(dto.isActive());
+        doc.setYears(new ArrayList<>());
+
+        return doc;
     }
 }

@@ -2,7 +2,6 @@ package com.epam.trainer_workload_service.controller;
 
 import com.epam.trainer_workload_service.api.WorkloadApi;
 import com.epam.trainer_workload_service.model.TrainingSummary;
-import com.epam.trainer_workload_service.service.ServiceException;
 import com.epam.trainer_workload_service.service.WorkloadService;
 import org.slf4j.MDC;
 import org.springframework.http.ResponseEntity;
@@ -25,7 +24,7 @@ public class WorkloadController implements WorkloadApi {
             Integer year,
             Integer month,
             String transactionId
-    ) throws ServiceException {
+    ) {
         if (transactionId == null || transactionId.isBlank()) {
             transactionId = UUID.randomUUID().toString();
         }

@@ -37,57 +37,15 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/TrainingSummary"
+                $ref: "./dto.yaml#/components/schemas/TrainingSummary"
         "400":
           description: Invalid input
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "./dto.yaml#/components/schemas/ErrorResponse"
         "404":
           description: Trainer not found
         "500":
           description: Internal server error
 
-components:
-  schemas:
-    TrainingSummary:
-      type: object
-      properties:
-        username:
-          type: string
-        firstName:
-          type: string
-        lastName:
-          type: string
-        active:
-          type: boolean
-        years:
-          type: array
-          items:
-            $ref: "#/components/schemas/YearSummary"
-
-    YearSummary:
-      type: object
-      properties:
-        year:
-          type: integer
-        months:
-          type: array
-          items:
-            $ref: "#/components/schemas/MonthSummary"
-
-    MonthSummary:
-      type: object
-      properties:
-        month:
-          type: integer
-        totalMinutes:
-          type: integer
-          format: int64
-
-    ErrorResponse:
-      type: object
-      properties:
-        error:
-          type: string

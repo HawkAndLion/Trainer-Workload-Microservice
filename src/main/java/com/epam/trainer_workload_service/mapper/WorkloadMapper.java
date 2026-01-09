@@ -1,80 +1,69 @@
 package com.epam.trainer_workload_service.mapper;
 
-import com.epam.trainer_workload_service.entity.TrainerMonthlyWorkload;
 import com.epam.trainer_workload_service.model.MonthSummary;
 import com.epam.trainer_workload_service.model.TrainingSummary;
 import com.epam.trainer_workload_service.model.YearSummary;
+import com.epam.trainer_workload_service.mongo.MonthWorkload;
+import com.epam.trainer_workload_service.mongo.TrainerWorkloadDocument;
+import com.epam.trainer_workload_service.mongo.YearWorkload;
 import org.springframework.stereotype.Component;
 
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @Component
 public class WorkloadMapper {
 
     private static final String NULL_ARGUMENT = "Argument should not be null";
 
-    public TrainingSummary toTrainingSummary(String username,
-                                             List<TrainerMonthlyWorkload> records) {
-        if (username != null && !records.isEmpty()) {
-            TrainingSummary summary = new TrainingSummary();
+    public TrainingSummary toTrainingSummary(
+            TrainerWorkloadDocument doc,
+            int year,
+            int month
+    ) {
+        if (doc != null) {
+            TrainingSummary summary = new TrainingSummary()
+                    .username(doc.getUsername())
+                    .firstName(doc.getFirstName())
+                    .lastName(doc.getLastName())
+                    .active(doc.isActive());
 
-            summary.setUsername(username);
-
-            if (records.isEmpty()) {
-                summary.setActive(false);
-                summary.setYears(Collections.emptyList());
-
+            if (doc.getYears() == null || doc.getYears().isEmpty()) {
                 return summary;
             }
 
-            TrainerMonthlyWorkload base = records.get(0);
-            summary.setFirstName(base.getFirstName());
-            summary.setLastName(base.getLastName());
-            summary.setActive(base.isActive());
+            YearWorkload yearNode = doc.getYears().stream()
+                    .filter(y -> y.getYear() == year)
+                    .findFirst()
+                    .orElse(null);
 
-            summary.setYears(buildYearSummaries(records));
+            if (yearNode == null) {
+                return summary;
+            }
+
+            MonthWorkload monthNode = yearNode.getMonths().stream()
+                    .filter(m -> m.getMonth() == month)
+                    .findFirst()
+                    .orElse(null);
+
+            if (monthNode == null) {
+                return summary;
+            }
+
+            MonthSummary monthSummary = new MonthSummary()
+                    .month(month)
+                    .totalMinutes(monthNode.getTotalMinutes());
+
+            YearSummary yearSummary = new YearSummary()
+                    .year(year)
+                    .months(List.of(monthSummary));
+
+            summary.setYears(List.of(yearSummary));
 
             return summary;
+
         } else {
             throw new IllegalArgumentException(NULL_ARGUMENT);
         }
 
-    }
-
-    private static List<YearSummary> buildYearSummaries(
-            List<TrainerMonthlyWorkload> records) {
-
-        return records.stream()
-                .collect(Collectors.groupingBy(TrainerMonthlyWorkload::getYear))
-                .entrySet().stream()
-                .map(entry -> {
-                    YearSummary year = new YearSummary();
-                    year.setYear(entry.getKey());
-
-                    List<MonthSummary> months = getMonthSummaries(entry);
-
-                    year.setMonths(months);
-
-                    return year;
-                })
-                .sorted(Comparator.comparing(YearSummary::getYear))
-                .toList();
-    }
-
-    private static List<MonthSummary> getMonthSummaries(Map.Entry<Integer, List<TrainerMonthlyWorkload>> entry) {
-        return entry.getValue().stream()
-                .map(w -> {
-                    MonthSummary summary = new MonthSummary();
-                    summary.setMonth(w.getMonth());
-                    summary.setTotalMinutes(w.getTotalMinutes());
-
-                    return summary;
-                })
-                .sorted(Comparator.comparing(MonthSummary::getMonth))
-                .toList();
     }
 }
