@@ -1,6 +1,6 @@
 package com.epam.trainer_workload_service.controller;
 
-import com.epam.trainer_workload_service.model.TrainingSummary;
+import com.epam.trainer_workload_service.model.TrainingSummaryResponseDto;
 import com.epam.trainer_workload_service.service.ServiceException;
 import com.epam.trainer_workload_service.service.WorkloadService;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,7 +40,7 @@ class WorkloadControllerTest {
     @Test
     void shouldReturnSummaryWhenGetMonthlySummaryRequested() throws Exception {
         // Given
-        TrainingSummary summary = new TrainingSummary();
+        TrainingSummaryResponseDto summary = new TrainingSummaryResponseDto();
         summary.setUsername("trainer1");
         summary.setFirstName("John");
         summary.setLastName("Doe");

@@ -1,7 +1,7 @@
 package com.epam.trainer_workload_service.controller;
 
 import com.epam.trainer_workload_service.api.WorkloadApi;
-import com.epam.trainer_workload_service.model.TrainingSummary;
+import com.epam.trainer_workload_service.model.TrainingSummaryResponseDto;
 import com.epam.trainer_workload_service.service.WorkloadService;
 import org.slf4j.MDC;
 import org.springframework.http.ResponseEntity;
@@ -19,7 +19,7 @@ public class WorkloadController implements WorkloadApi {
     }
 
     @Override
-    public ResponseEntity<TrainingSummary> getMonthlySummary(
+    public ResponseEntity<TrainingSummaryResponseDto> getMonthlySummary(
             String username,
             Integer year,
             Integer month,
@@ -32,7 +32,7 @@ public class WorkloadController implements WorkloadApi {
         MDC.put("transactionId", transactionId);
 
         try {
-            TrainingSummary summary =
+            TrainingSummaryResponseDto summary =
                     workloadService.getSummaryForTrainer(username, year, month);
 
             return ResponseEntity.ok(summary);

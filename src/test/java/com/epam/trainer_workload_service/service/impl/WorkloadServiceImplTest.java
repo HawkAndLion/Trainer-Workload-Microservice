@@ -4,9 +4,9 @@ import com.epam.trainer_workload_service.dto.ActionType;
 import com.epam.trainer_workload_service.dto.TrainingEventDto;
 import com.epam.trainer_workload_service.entity.TrainingEventRecord;
 import com.epam.trainer_workload_service.mapper.WorkloadMapper;
-import com.epam.trainer_workload_service.model.MonthSummary;
-import com.epam.trainer_workload_service.model.TrainingSummary;
-import com.epam.trainer_workload_service.model.YearSummary;
+import com.epam.trainer_workload_service.model.MonthSummaryDto;
+import com.epam.trainer_workload_service.model.TrainingSummaryResponseDto;
+import com.epam.trainer_workload_service.model.YearSummaryDto;
 import com.epam.trainer_workload_service.mongo.MonthWorkload;
 import com.epam.trainer_workload_service.mongo.TrainerWorkloadDocument;
 import com.epam.trainer_workload_service.mongo.YearWorkload;
@@ -145,15 +145,15 @@ class WorkloadServiceImplTest {
         workloadDocument.setActive(true);
         workloadDocument.setYears(years);
 
-        MonthSummary monthSummary = new MonthSummary()
+        MonthSummaryDto monthSummary = new MonthSummaryDto()
                 .month(5)
                 .totalMinutes(60L);
 
-        YearSummary yearSummary = new YearSummary()
+        YearSummaryDto yearSummary = new YearSummaryDto()
                 .year(2025)
                 .months(List.of(monthSummary));
 
-        TrainingSummary summary = new TrainingSummary();
+        TrainingSummaryResponseDto summary = new TrainingSummaryResponseDto();
         summary.setUsername(USERNAME);
         summary.setFirstName(FIRSTNAME);
         summary.setLastName(LASTNAME);
@@ -165,7 +165,7 @@ class WorkloadServiceImplTest {
         when(workloadMapper.toTrainingSummary(workloadDocument, 2025, 5)).thenReturn(summary);
 
         // When
-        TrainingSummary result = service.getSummaryForTrainer(USERNAME, 2025, 5);
+        TrainingSummaryResponseDto result = service.getSummaryForTrainer(USERNAME, 2025, 5);
 
         // Then
         verify(workloadRepository).findByUsername(USERNAME);
@@ -203,15 +203,15 @@ class WorkloadServiceImplTest {
         workloadDocument.setActive(true);
         workloadDocument.setYears(years);
 
-        MonthSummary monthSummary = new MonthSummary()
+        MonthSummaryDto monthSummary = new MonthSummaryDto()
                 .month(5)
                 .totalMinutes(60L);
 
-        YearSummary yearSummary = new YearSummary()
+        YearSummaryDto yearSummary = new YearSummaryDto()
                 .year(2025)
                 .months(List.of(monthSummary));
 
-        TrainingSummary summary = new TrainingSummary();
+        TrainingSummaryResponseDto summary = new TrainingSummaryResponseDto();
         summary.setUsername(USERNAME);
         summary.setFirstName(FIRSTNAME);
         summary.setLastName(LASTNAME);
@@ -224,7 +224,7 @@ class WorkloadServiceImplTest {
         when(workloadRepository.findByUsername(USERNAME)).thenReturn(Optional.of(workloadDocument));
 
         // When
-        TrainingSummary result = service.getSummaryForTrainer(USERNAME, 2025, 5);
+        TrainingSummaryResponseDto result = service.getSummaryForTrainer(USERNAME, 2025, 5);
 
         // Then
         verify(workloadRepository).findByUsername(USERNAME);
@@ -434,15 +434,15 @@ class WorkloadServiceImplTest {
         workloadDocument.setActive(true);
         workloadDocument.setYears(years);
 
-        MonthSummary monthSummary = new MonthSummary()
+        MonthSummaryDto monthSummary = new MonthSummaryDto()
                 .month(1)
                 .totalMinutes(60L);
 
-        YearSummary yearSummary = new YearSummary()
+        YearSummaryDto yearSummary = new YearSummaryDto()
                 .year(2025)
                 .months(List.of(monthSummary));
 
-        TrainingSummary summary = new TrainingSummary();
+        TrainingSummaryResponseDto summary = new TrainingSummaryResponseDto();
         summary.setUsername(USERNAME);
         summary.setFirstName(FIRSTNAME);
         summary.setLastName(LASTNAME);
@@ -454,7 +454,7 @@ class WorkloadServiceImplTest {
         when(workloadMapper.toTrainingSummary(workloadDocument, 2025, 1)).thenReturn(summary);
 
         // When
-        TrainingSummary result = service.getSummaryForTrainer(USERNAME, 2025, 1);
+        TrainingSummaryResponseDto result = service.getSummaryForTrainer(USERNAME, 2025, 1);
 
         // Then
         verify(workloadRepository).findByUsername(USERNAME);

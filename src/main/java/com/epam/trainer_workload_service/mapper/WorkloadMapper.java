@@ -1,8 +1,8 @@
 package com.epam.trainer_workload_service.mapper;
 
-import com.epam.trainer_workload_service.model.MonthSummary;
-import com.epam.trainer_workload_service.model.TrainingSummary;
-import com.epam.trainer_workload_service.model.YearSummary;
+import com.epam.trainer_workload_service.model.MonthSummaryDto;
+import com.epam.trainer_workload_service.model.TrainingSummaryResponseDto;
+import com.epam.trainer_workload_service.model.YearSummaryDto;
 import com.epam.trainer_workload_service.mongo.MonthWorkload;
 import com.epam.trainer_workload_service.mongo.TrainerWorkloadDocument;
 import com.epam.trainer_workload_service.mongo.YearWorkload;
@@ -15,13 +15,13 @@ public class WorkloadMapper {
 
     private static final String NULL_ARGUMENT = "Argument should not be null";
 
-    public TrainingSummary toTrainingSummary(
+    public TrainingSummaryResponseDto toTrainingSummary(
             TrainerWorkloadDocument doc,
             int year,
             int month
     ) {
         if (doc != null) {
-            TrainingSummary summary = new TrainingSummary()
+            TrainingSummaryResponseDto summary = new TrainingSummaryResponseDto()
                     .username(doc.getUsername())
                     .firstName(doc.getFirstName())
                     .lastName(doc.getLastName())
@@ -49,11 +49,11 @@ public class WorkloadMapper {
                 return summary;
             }
 
-            MonthSummary monthSummary = new MonthSummary()
+            MonthSummaryDto monthSummary = new MonthSummaryDto()
                     .month(month)
                     .totalMinutes(monthNode.getTotalMinutes());
 
-            YearSummary yearSummary = new YearSummary()
+            YearSummaryDto yearSummary = new YearSummaryDto()
                     .year(year)
                     .months(List.of(monthSummary));
 

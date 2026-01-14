@@ -37,7 +37,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "./dto.yaml#/components/schemas/TrainingSummary"
+                $ref: "./dto.yaml#/components/schemas/TrainingSummaryResponseDto"
         "400":
           description: Invalid input
           content:

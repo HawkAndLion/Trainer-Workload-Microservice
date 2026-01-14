@@ -1,6 +1,6 @@
 components:
   schemas:
-    TrainingSummary:
+    TrainingSummaryResponseDto:
       type: object
       properties:
         username:
@@ -14,9 +14,9 @@ components:
         years:
           type: array
           items:
-            $ref: "#/components/schemas/YearSummary"
+            $ref: "#/components/schemas/YearSummaryDto"
 
-    YearSummary:
+    YearSummaryDto:
       type: object
       properties:
         year:
@@ -24,9 +24,9 @@ components:
         months:
           type: array
           items:
-            $ref: "#/components/schemas/MonthSummary"
+            $ref: "#/components/schemas/MonthSummaryDto"
 
-    MonthSummary:
+    MonthSummaryDto:
       type: object
       properties:
         month:

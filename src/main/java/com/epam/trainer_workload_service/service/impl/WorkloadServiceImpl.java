@@ -4,7 +4,7 @@ import com.epam.trainer_workload_service.dto.ActionType;
 import com.epam.trainer_workload_service.dto.TrainingEventDto;
 import com.epam.trainer_workload_service.entity.TrainingEventRecord;
 import com.epam.trainer_workload_service.mapper.WorkloadMapper;
-import com.epam.trainer_workload_service.model.TrainingSummary;
+import com.epam.trainer_workload_service.model.TrainingSummaryResponseDto;
 import com.epam.trainer_workload_service.mongo.MonthWorkload;
 import com.epam.trainer_workload_service.mongo.TrainerWorkloadDocument;
 import com.epam.trainer_workload_service.mongo.YearWorkload;
@@ -65,7 +65,7 @@ public class WorkloadServiceImpl implements WorkloadService {
     }
 
     @Override
-    public TrainingSummary getSummaryForTrainer(String username, int year, int month)
+    public TrainingSummaryResponseDto getSummaryForTrainer(String username, int year, int month)
             throws ServiceException {
 
         if (username != null) {
