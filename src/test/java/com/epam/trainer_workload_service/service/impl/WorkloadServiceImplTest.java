@@ -1,10 +1,16 @@
 package com.epam.trainer_workload_service.service.impl;
 
-import com.epam.trainer_workload_service.dto.*;
-import com.epam.trainer_workload_service.entity.TrainerMonthlyWorkload;
+import com.epam.trainer_workload_service.dto.ActionType;
+import com.epam.trainer_workload_service.dto.TrainingEventDto;
 import com.epam.trainer_workload_service.entity.TrainingEventRecord;
 import com.epam.trainer_workload_service.mapper.WorkloadMapper;
-import com.epam.trainer_workload_service.repository.TrainerMonthlyWorkloadRepository;
+import com.epam.trainer_workload_service.model.MonthSummaryDto;
+import com.epam.trainer_workload_service.model.TrainingSummaryResponseDto;
+import com.epam.trainer_workload_service.model.YearSummaryDto;
+import com.epam.trainer_workload_service.mongo.MonthWorkload;
+import com.epam.trainer_workload_service.mongo.TrainerWorkloadDocument;
+import com.epam.trainer_workload_service.mongo.YearWorkload;
+import com.epam.trainer_workload_service.repository.TrainerWorkloadRepository;
 import com.epam.trainer_workload_service.repository.TrainingEventRecordRepository;
 import com.epam.trainer_workload_service.service.ServiceException;
 import org.junit.jupiter.api.Test;
@@ -15,7 +21,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -27,9 +35,12 @@ class WorkloadServiceImplTest {
     private static final String NULL_USERNAME = "Username must not be null";
     private static final String NEGATIVE_DURATION_MINUTES = "DurationMinutes must be non-negative";
     private static final String TRAINING_TO_DELETE_NOT_FOUND = "Training not found: ";
+    private static final String USERNAME = "John.Doe";
+    private static final String FIRSTNAME = "John";
+    private static final String LASTNAME = "Doe";
 
     @Mock
-    private TrainerMonthlyWorkloadRepository workloadRepository;
+    private TrainerWorkloadRepository workloadRepository;
 
     @Mock
     private TrainingEventRecordRepository eventRepository;
@@ -46,15 +57,15 @@ class WorkloadServiceImplTest {
         // Given
         TrainingEventDto dto = new TrainingEventDto();
         dto.setTrainingId(1L);
-        dto.setUsername("John.Doe");
-        dto.setFirstName("John");
-        dto.setLastName("Doe");
+        dto.setUsername(USERNAME);
+        dto.setFirstName(FIRSTNAME);
+        dto.setLastName(LASTNAME);
         dto.setActive(true);
         dto.setTrainingDate(LocalDate.of(2025, 5, 10));
         dto.setDurationMinutes(90);
         dto.setActionType(ActionType.ADD);
 
-        TrainingEventRecord eventRecord = new TrainingEventRecord(1L, "John.Doe", LocalDate.of(2025, 5, 10), 90);
+        TrainingEventRecord eventRecord = new TrainingEventRecord(1L, USERNAME, LocalDate.of(2025, 5, 10), 90);
 
         when(eventRepository.existsByTrainingId(dto.getTrainingId())).thenReturn(true);
 
@@ -71,107 +82,155 @@ class WorkloadServiceImplTest {
     void shouldRemoveRecordAndDecreaseWorkloadWhenProcessTrainerEventIsDeleteEvent() {
         // Given
         TrainingEventDto dto = new TrainingEventDto();
-        dto.setUsername("John.Doe");
-        dto.setFirstName("John");
-        dto.setLastName("Doe");
+        dto.setUsername(USERNAME);
+        dto.setFirstName(FIRSTNAME);
+        dto.setLastName(LASTNAME);
         dto.setActive(true);
         dto.setTrainingDate(LocalDate.of(2025, 5, 10));
         dto.setDurationMinutes(60);
         dto.setActionType(ActionType.DELETE);
 
-        TrainingEventRecord eventRecord = new TrainingEventRecord(1L, "John.Doe", LocalDate.of(2025, 5, 10), 60);
+        TrainingEventRecord eventRecord = new TrainingEventRecord(1L, USERNAME, LocalDate.of(2025, 5, 10), 60);
 
-        TrainerMonthlyWorkload workload = new TrainerMonthlyWorkload();
-        workload.setId(1L);
-        workload.setUsername("John.Doe");
-        workload.setFirstName("John");
-        workload.setLastName("Doe");
-        workload.setActive(true);
-        workload.setYear(2025);
-        workload.setMonth(5);
-        workload.setTotalMinutes(eventRecord.getDurationMinutes());
+        MonthWorkload monthSummary = new MonthWorkload();
+        monthSummary.setMonth(5);
+        monthSummary.setTotalMinutes(60L);
+        List<MonthWorkload> months = new ArrayList<>();
+        months.add(monthSummary);
+        YearWorkload yearSummary = new YearWorkload();
+        yearSummary.setYear(2025);
+        yearSummary.setMonths(months);
+        List<YearWorkload> years = new ArrayList<>();
+        years.add(yearSummary);
+
+        TrainerWorkloadDocument workloadDocument = new TrainerWorkloadDocument();
+        workloadDocument.setUsername(USERNAME);
+        workloadDocument.setFirstName(FIRSTNAME);
+        workloadDocument.setLastName(LASTNAME);
+        workloadDocument.setActive(true);
+        workloadDocument.setYears(years);
 
         when(eventRepository.findByTrainingId(dto.getTrainingId())).thenReturn(Optional.of(eventRecord));
 
-        when(workloadRepository.findByUsernameAndYearAndMonth(anyString(), anyInt(), anyInt()))
-                .thenReturn(Optional.of(workload));
+        when(workloadRepository.findByUsername(anyString()))
+                .thenReturn(Optional.of(workloadDocument));
 
         // When
         service.processTrainerEvent(dto);
 
         // Then
         verify(eventRepository).delete(any(TrainingEventRecord.class));
-        verify(workloadRepository).save(any(TrainerMonthlyWorkload.class));
-        assertDoesNotThrow(() -> service.processTrainerEvent(dto));
+        verify(workloadRepository).save(any(TrainerWorkloadDocument.class));
     }
 
     @Test
     void shouldExecuteGetSummaryForTrainerWhenValidValues() throws ServiceException {
         // Given
-        TrainingEventRecord eventRecord = new TrainingEventRecord(1L, "John.Doe", LocalDate.of(2025, 5, 10), 60);
+        MonthWorkload month = new MonthWorkload();
+        month.setMonth(5);
+        month.setTotalMinutes(60L);
+        List<MonthWorkload> months = new ArrayList<>();
+        months.add(month);
 
-        TrainerMonthlyWorkload workload = new TrainerMonthlyWorkload();
-        workload.setId(1L);
-        workload.setUsername("John.Doe");
-        workload.setFirstName("John");
-        workload.setLastName("Doe");
-        workload.setActive(true);
-        workload.setYear(2025);
-        workload.setMonth(5);
-        workload.setTotalMinutes(eventRecord.getDurationMinutes());
+        YearWorkload year = new YearWorkload();
+        year.setYear(2025);
+        year.setMonths(months);
+        List<YearWorkload> years = new ArrayList<>();
+        years.add(year);
 
-        List<TrainerMonthlyWorkload> records = new ArrayList<>();
-        records.add(workload);
+        TrainerWorkloadDocument workloadDocument = new TrainerWorkloadDocument();
+        workloadDocument.setUsername(USERNAME);
+        workloadDocument.setFirstName(FIRSTNAME);
+        workloadDocument.setLastName(LASTNAME);
+        workloadDocument.setActive(true);
+        workloadDocument.setYears(years);
 
-        MonthSummaryDto monthSummaryDto = new MonthSummaryDto(5, 60);
-        List<MonthSummaryDto> months = new ArrayList<>();
-        months.add(monthSummaryDto);
-        YearSummaryDto yearSummaryDto = new YearSummaryDto(2025, months);
-        List<YearSummaryDto> years = new ArrayList<>();
-        years.add(yearSummaryDto);
+        MonthSummaryDto monthSummary = new MonthSummaryDto()
+                .month(5)
+                .totalMinutes(60L);
 
-        when(workloadMapper.toTrainingSummary("John.Doe", records))
-                .thenReturn(new TrainingSummaryDto("John.Doe", "John", "Doe", true, years));
+        YearSummaryDto yearSummary = new YearSummaryDto()
+                .year(2025)
+                .months(List.of(monthSummary));
 
-        when(workloadRepository.findByUsername("John.Doe")).thenReturn(List.of(workload));
+        TrainingSummaryResponseDto summary = new TrainingSummaryResponseDto();
+        summary.setUsername(USERNAME);
+        summary.setFirstName(FIRSTNAME);
+        summary.setLastName(LASTNAME);
+        summary.setActive(true);
+        summary.setYears(List.of(yearSummary));
+
+        when(workloadRepository.findByUsername(USERNAME)).thenReturn(Optional.of(workloadDocument));
+
+        when(workloadMapper.toTrainingSummary(workloadDocument, 2025, 5)).thenReturn(summary);
 
         // When
-        TrainingSummaryDto summary = service.getSummaryForTrainer("John.Doe", 2025, 5);
+        TrainingSummaryResponseDto result = service.getSummaryForTrainer(USERNAME, 2025, 5);
 
         // Then
-        verify(workloadRepository).findByUsername("John.Doe");
-        assertNotNull(summary);
-        assertEquals("John.Doe", summary.getUsername());
-        assertEquals("John", summary.getFirstName());
-        assertEquals("Doe", summary.getLastName());
-        assertTrue(summary.isActive());
-        assertFalse(summary.getYears().isEmpty());
-        assertEquals(2025, summary.getYears().get(0).getYear());
-        assertEquals(5, summary.getYears().get(0).getMonths().get(0).getMonth());
-        assertEquals(60, summary.getYears().get(0).getMonths().get(0).getTotalMinutes());
+        verify(workloadRepository).findByUsername(USERNAME);
+        verify(workloadMapper).toTrainingSummary(workloadDocument, 2025, 5);
+        assertNotNull(result);
+        assertEquals(USERNAME, result.getUsername());
+        assertEquals(FIRSTNAME, result.getFirstName());
+        assertEquals(LASTNAME, result.getLastName());
+        assertTrue(result.getActive());
+        assertFalse(result.getYears().isEmpty());
+        assertEquals(2025, result.getYears().get(0).getYear());
+        assertEquals(5, result.getYears().get(0).getMonths().get(0).getMonth());
+        assertEquals(60, result.getYears().get(0).getMonths().get(0).getTotalMinutes());
     }
 
     @Test
     void shouldUpdateTrainerInfoFromFirstRecordWhenGetSummaryForTrainerCalled() throws ServiceException {
         // Given
-        List<TrainerMonthlyWorkload> workloads = Arrays.asList(
-                new TrainerMonthlyWorkload("John.Doe", "John", "Doe", true, 2024, 1, 100L),
-                new TrainerMonthlyWorkload("John.Doe", "John", "Doe", false, 2024, 2, 150L)
-        );
-        when(workloadMapper.toTrainingSummary("John.Doe", workloads))
-                .thenReturn(new TrainingSummaryDto("John.Doe", "John", "Doe", true, List.of()));
+        MonthWorkload month = new MonthWorkload();
+        month.setMonth(5);
+        month.setTotalMinutes(60L);
+        List<MonthWorkload> months = new ArrayList<>();
+        months.add(month);
 
-        when(workloadRepository.findByUsername("John.Doe"))
-                .thenReturn(workloads);
+        YearWorkload year = new YearWorkload();
+        year.setYear(2025);
+        year.setMonths(months);
+        List<YearWorkload> years = new ArrayList<>();
+        years.add(year);
+
+        TrainerWorkloadDocument workloadDocument = new TrainerWorkloadDocument();
+        workloadDocument.setUsername(USERNAME);
+        workloadDocument.setFirstName(FIRSTNAME);
+        workloadDocument.setLastName(LASTNAME);
+        workloadDocument.setActive(true);
+        workloadDocument.setYears(years);
+
+        MonthSummaryDto monthSummary = new MonthSummaryDto()
+                .month(5)
+                .totalMinutes(60L);
+
+        YearSummaryDto yearSummary = new YearSummaryDto()
+                .year(2025)
+                .months(List.of(monthSummary));
+
+        TrainingSummaryResponseDto summary = new TrainingSummaryResponseDto();
+        summary.setUsername(USERNAME);
+        summary.setFirstName(FIRSTNAME);
+        summary.setLastName(LASTNAME);
+        summary.setActive(true);
+        summary.setYears(List.of(yearSummary));
+
+        when(workloadMapper.toTrainingSummary(workloadDocument, 2025, 5))
+                .thenReturn(summary);
+
+        when(workloadRepository.findByUsername(USERNAME)).thenReturn(Optional.of(workloadDocument));
 
         // When
-        TrainingSummaryDto result = service.getSummaryForTrainer("John.Doe", 2024, 1);
+        TrainingSummaryResponseDto result = service.getSummaryForTrainer(USERNAME, 2025, 5);
 
         // Then
-        verify(workloadRepository).findByUsername("John.Doe");
-        assertEquals("John", result.getFirstName());
-        assertEquals("Doe", result.getLastName());
-        assertTrue(result.isActive());
+        verify(workloadRepository).findByUsername(USERNAME);
+        assertEquals(FIRSTNAME, result.getFirstName());
+        assertEquals(LASTNAME, result.getLastName());
+        assertTrue(result.getActive());
     }
 
     @Test
@@ -297,57 +356,113 @@ class WorkloadServiceImplTest {
     void shouldNotAllowNegativeTotalMinutesWhenSubtractOnDeleteAction() {
         // Given
         TrainingEventDto dto = new TrainingEventDto();
-        dto.setUsername("John.Doe");
-        dto.setFirstName("John");
-        dto.setLastName("Doe");
+        dto.setUsername(USERNAME);
+        dto.setFirstName(FIRSTNAME);
+        dto.setLastName(LASTNAME);
         dto.setActive(true);
         dto.setTrainingDate(LocalDate.of(2024, 1, 15));
         dto.setDurationMinutes(90L);
         dto.setActionType(ActionType.DELETE);
 
         TrainingEventRecord existingEvent = new TrainingEventRecord(1L,
-                "John.Doe",
+                USERNAME,
                 LocalDate.of(2024, 1, 15),
                 90L);
 
         lenient().when(eventRepository.findByTrainingId(dto.getTrainingId()))
                 .thenReturn(Optional.of(existingEvent));
 
-        TrainerMonthlyWorkload existingWorkload = new TrainerMonthlyWorkload(
-                "John.Doe", "John", "Doe", true, 2024, 1, 50L
-        );
+        MonthWorkload month = new MonthWorkload();
+        month.setMonth(1);
+        month.setTotalMinutes(90L);
+        List<MonthWorkload> months = new ArrayList<>();
+        months.add(month);
 
-        when(workloadRepository.findByUsernameAndYearAndMonth(
-                eq("John.Doe"), eq(2024), eq(1)))
-                .thenReturn(Optional.of(existingWorkload));
+        YearWorkload year = new YearWorkload();
+        year.setYear(2024);
+        year.setMonths(months);
+        List<YearWorkload> years = new ArrayList<>();
+        years.add(year);
+
+        TrainerWorkloadDocument workloadDocument = new TrainerWorkloadDocument();
+        workloadDocument.setUsername(USERNAME);
+        workloadDocument.setFirstName(FIRSTNAME);
+        workloadDocument.setLastName(LASTNAME);
+        workloadDocument.setActive(true);
+        workloadDocument.setYears(years);
+
+        when(workloadRepository.findByUsername(USERNAME)).thenReturn(Optional.of(workloadDocument));
 
         // When
         service.processTrainerEvent(dto);
 
         // Then
-        ArgumentCaptor<TrainerMonthlyWorkload> captor =
-                ArgumentCaptor.forClass(TrainerMonthlyWorkload.class);
-        verify(eventRepository).delete(existingEvent);
+        ArgumentCaptor<TrainerWorkloadDocument> captor =
+                ArgumentCaptor.forClass(TrainerWorkloadDocument.class);
+
         verify(workloadRepository).save(captor.capture());
-        assertEquals(0L, captor.getValue().getTotalMinutes());
+
+        TrainerWorkloadDocument saved = captor.getValue();
+        YearWorkload year2 = saved.getYears().get(0);
+        MonthWorkload month2 = year2.getMonths().get(0);
+
+        verify(eventRepository).delete(existingEvent);
+        assertEquals(0L, month2.getTotalMinutes());
+
     }
 
 
     @Test
     void getSummaryForTrainer_noRecords_returnsEmpty() throws ServiceException {
         // Given
-        when(workloadRepository.findByUsername("john")).thenReturn(Collections.emptyList());
+        MonthWorkload month = new MonthWorkload();
+        month.setMonth(1);
+        month.setTotalMinutes(60L);
+        List<MonthWorkload> months = new ArrayList<>();
+        months.add(month);
+
+        YearWorkload year = new YearWorkload();
+        year.setYear(2025);
+        year.setMonths(months);
+        List<YearWorkload> years = new ArrayList<>();
+        years.add(year);
+
+        TrainerWorkloadDocument workloadDocument = new TrainerWorkloadDocument();
+        workloadDocument.setUsername(USERNAME);
+        workloadDocument.setFirstName(FIRSTNAME);
+        workloadDocument.setLastName(LASTNAME);
+        workloadDocument.setActive(true);
+        workloadDocument.setYears(years);
+
+        MonthSummaryDto monthSummary = new MonthSummaryDto()
+                .month(1)
+                .totalMinutes(60L);
+
+        YearSummaryDto yearSummary = new YearSummaryDto()
+                .year(2025)
+                .months(List.of(monthSummary));
+
+        TrainingSummaryResponseDto summary = new TrainingSummaryResponseDto();
+        summary.setUsername(USERNAME);
+        summary.setFirstName(FIRSTNAME);
+        summary.setLastName(LASTNAME);
+        summary.setActive(true);
+        summary.setYears(List.of(yearSummary));
+
+        when(workloadRepository.findByUsername(USERNAME)).thenReturn(Optional.of(workloadDocument));
+
+        when(workloadMapper.toTrainingSummary(workloadDocument, 2025, 1)).thenReturn(summary);
 
         // When
-        TrainingSummaryDto summary = service.getSummaryForTrainer("john", 2025, 1);
+        TrainingSummaryResponseDto result = service.getSummaryForTrainer(USERNAME, 2025, 1);
 
         // Then
-        verify(workloadRepository).findByUsername("john");
+        verify(workloadRepository).findByUsername(USERNAME);
         verifyNoMoreInteractions(workloadRepository);
-        assertNotNull(summary);
-        assertEquals("john", summary.getUsername());
-        assertFalse(summary.isActive());
-        assertTrue(summary.getYears().isEmpty());
+        assertNotNull(result);
+        assertEquals(USERNAME, result.getUsername());
+        assertTrue(result.getActive());
+        assertFalse(result.getYears().isEmpty());
     }
 
     @Test

@@ -1,0 +1,42 @@
+components:
+  schemas:
+    TrainingSummaryResponseDto:
+      type: object
+      properties:
+        username:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        active:
+          type: boolean
+        years:
+          type: array
+          items:
+            $ref: "#/components/schemas/YearSummaryDto"
+
+    YearSummaryDto:
+      type: object
+      properties:
+        year:
+          type: integer
+        months:
+          type: array
+          items:
+            $ref: "#/components/schemas/MonthSummaryDto"
+
+    MonthSummaryDto:
+      type: object
+      properties:
+        month:
+          type: integer
+        totalMinutes:
+          type: integer
+          format: int64
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string

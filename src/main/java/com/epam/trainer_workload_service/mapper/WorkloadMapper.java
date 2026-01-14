@@ -1,70 +1,69 @@
 package com.epam.trainer_workload_service.mapper;
 
-import com.epam.trainer_workload_service.dto.MonthSummaryDto;
-import com.epam.trainer_workload_service.dto.TrainingSummaryDto;
-import com.epam.trainer_workload_service.dto.YearSummaryDto;
-import com.epam.trainer_workload_service.entity.TrainerMonthlyWorkload;
+import com.epam.trainer_workload_service.model.MonthSummaryDto;
+import com.epam.trainer_workload_service.model.TrainingSummaryResponseDto;
+import com.epam.trainer_workload_service.model.YearSummaryDto;
+import com.epam.trainer_workload_service.mongo.MonthWorkload;
+import com.epam.trainer_workload_service.mongo.TrainerWorkloadDocument;
+import com.epam.trainer_workload_service.mongo.YearWorkload;
 import org.springframework.stereotype.Component;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.List;
 
 @Component
 public class WorkloadMapper {
 
-    public TrainingSummaryDto toTrainingSummary(String username,
-                                                List<TrainerMonthlyWorkload> records) {
-        if (records != null && !records.isEmpty()) {
-            TrainerMonthlyWorkload base = records.get(0);
+    private static final String NULL_ARGUMENT = "Argument should not be null";
 
-            return new TrainingSummaryDto(
-                    base.getUsername(),
-                    base.getFirstName(),
-                    base.getLastName(),
-                    base.isActive(),
-                    buildYearSummaries(records)
-            );
-        } else {
-            return new TrainingSummaryDto(username, null, null, false, Collections.emptyList());
-        }
-
-    }
-
-    private List<MonthSummaryDto> toMonthSummaries(
-            List<TrainerMonthlyWorkload> records
+    public TrainingSummaryResponseDto toTrainingSummary(
+            TrainerWorkloadDocument doc,
+            int year,
+            int month
     ) {
-        return records.stream()
-                .map(w ->
-                        new MonthSummaryDto(
-                                w.getMonth(),
-                                w.getTotalMinutes()
-                        )
-                )
-                .sorted(Comparator.comparing(MonthSummaryDto::getMonth))
-                .toList();
-    }
+        if (doc != null) {
+            TrainingSummaryResponseDto summary = new TrainingSummaryResponseDto()
+                    .username(doc.getUsername())
+                    .firstName(doc.getFirstName())
+                    .lastName(doc.getLastName())
+                    .active(doc.isActive());
 
-    private static List<YearSummaryDto> buildYearSummaries(
-            List<TrainerMonthlyWorkload> records) {
+            if (doc.getYears() == null || doc.getYears().isEmpty()) {
+                return summary;
+            }
 
-        Map<Integer, List<TrainerMonthlyWorkload>> byYear =
-                records.stream().collect(Collectors.groupingBy(
-                        TrainerMonthlyWorkload::getYear
-                ));
+            YearWorkload yearNode = doc.getYears().stream()
+                    .filter(y -> y.getYear() == year)
+                    .findFirst()
+                    .orElse(null);
 
-        List<YearSummaryDto> years = new ArrayList<>();
+            if (yearNode == null) {
+                return summary;
+            }
 
-        for (Map.Entry<Integer, List<TrainerMonthlyWorkload>> entry : byYear.entrySet()) {
-            List<MonthSummaryDto> months = entry.getValue().stream()
-                    .map(w -> new MonthSummaryDto(w.getMonth(), w.getTotalMinutes()))
-                    .sorted(Comparator.comparing(MonthSummaryDto::getMonth))
-                    .toList();
+            MonthWorkload monthNode = yearNode.getMonths().stream()
+                    .filter(m -> m.getMonth() == month)
+                    .findFirst()
+                    .orElse(null);
 
-            years.add(new YearSummaryDto(entry.getKey(), months));
+            if (monthNode == null) {
+                return summary;
+            }
+
+            MonthSummaryDto monthSummary = new MonthSummaryDto()
+                    .month(month)
+                    .totalMinutes(monthNode.getTotalMinutes());
+
+            YearSummaryDto yearSummary = new YearSummaryDto()
+                    .year(year)
+                    .months(List.of(monthSummary));
+
+            summary.setYears(List.of(yearSummary));
+
+            return summary;
+
+        } else {
+            throw new IllegalArgumentException(NULL_ARGUMENT);
         }
 
-        years.sort(Comparator.comparingInt(YearSummaryDto::getYear));
-
-        return years;
     }
 }

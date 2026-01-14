@@ -1,0 +1,51 @@
+openapi: 3.0.3
+info:
+  title: Trainer Workload API
+  version: 1.0.0
+
+paths:
+  /api/v1/workload/{username}/{year}/{month}:
+    get:
+      summary: Get monthly workload summary
+      operationId: getMonthlySummary
+      tags:
+        - Workload
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: year
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: month
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: transactionId
+          in: header
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Monthly workload summary
+          content:
+            application/json:
+              schema:
+                $ref: "./dto.yaml#/components/schemas/TrainingSummaryResponseDto"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "./dto.yaml#/components/schemas/ErrorResponse"
+        "404":
+          description: Trainer not found
+        "500":
+          description: Internal server error
+

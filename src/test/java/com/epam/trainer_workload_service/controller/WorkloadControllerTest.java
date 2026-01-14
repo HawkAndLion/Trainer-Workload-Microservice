@@ -1,6 +1,6 @@
 package com.epam.trainer_workload_service.controller;
 
-import com.epam.trainer_workload_service.dto.TrainingSummaryDto;
+import com.epam.trainer_workload_service.model.TrainingSummaryResponseDto;
 import com.epam.trainer_workload_service.service.ServiceException;
 import com.epam.trainer_workload_service.service.WorkloadService;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,7 +40,7 @@ class WorkloadControllerTest {
     @Test
     void shouldReturnSummaryWhenGetMonthlySummaryRequested() throws Exception {
         // Given
-        TrainingSummaryDto summary = new TrainingSummaryDto();
+        TrainingSummaryResponseDto summary = new TrainingSummaryResponseDto();
         summary.setUsername("trainer1");
         summary.setFirstName("John");
         summary.setLastName("Doe");
@@ -71,16 +71,15 @@ class WorkloadControllerTest {
     void getMonthlySummary_shouldThrowRuntimeExceptionOnServiceException() throws ServiceException {
         // Given
         when(workloadService.getSummaryForTrainer(anyString(), anyInt(), anyInt()))
-                .thenThrow(new ServiceException("error"));
+                .thenThrow(new ServiceException("Check input arguments. They might be null."));
 
         // When
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> {
+        ServiceException ex = assertThrows(ServiceException.class, () -> {
             controller.getMonthlySummary("trainer1", 2025, 5, null);
         });
 
         // Then
         verify(workloadService, times(1)).getSummaryForTrainer("trainer1", 2025, 5);
         assertEquals("Check input arguments. They might be null.", ex.getMessage());
-        assertEquals("error", ex.getCause().getMessage());
     }
 }

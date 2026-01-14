@@ -9,9 +9,12 @@ import jakarta.jms.Message;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jms.annotation.JmsListener;
 import org.springframework.stereotype.Component;
+
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -21,7 +24,7 @@ public class TrainingWorkloadEventListener {
     private static final String RECEIVED_TRAINING_EVENT = "RECEIVED training event: {}";
     private static final String AUTHORIZATION = "Authorization";
     private static final String BEARER = "Bearer ";
-//        private static final String BEARER = "Bearerer"; //for testing DLQ
+    //        private static final String BEARER = "Bearerer"; //for testing DLQ
     private static final Integer SEVEN = 7;
     private static final String INVALID_JWT_TOKEN = "Invalid JWT token";
     private static final String UNAUTHORIZED_MESSAGE = "Unauthorized service: ";
@@ -57,22 +60,32 @@ public class TrainingWorkloadEventListener {
     private void process(TrainingEventDto dto, Message message) throws JMSException {
         String authHeader = message.getStringProperty(AUTHORIZATION);
 
-        if (authHeader != null && authHeader.startsWith(BEARER)) {
-            String token = authHeader.substring(SEVEN);
+        String txId = message.getStringProperty("transactionId");
+        if (txId == null) {
+            txId = UUID.randomUUID().toString();
+        }
+        MDC.put("transactionId", txId);
 
-            if (!jwtTokenProvider.validateToken(token)) {
-                throw new SecurityException(INVALID_JWT_TOKEN);
+        try {
+            if (authHeader != null && authHeader.startsWith(BEARER)) {
+                String token = authHeader.substring(SEVEN);
+
+                if (!jwtTokenProvider.validateToken(token)) {
+                    throw new SecurityException(INVALID_JWT_TOKEN);
+                }
+
+                String subject = jwtTokenProvider.getUsernameFromToken(token);
+
+                if (!serviceName.equals(subject)) {
+                    throw new SecurityException(UNAUTHORIZED_MESSAGE + subject);
+                }
+
+                workloadService.processTrainerEvent(dto);
+            } else {
+                throw new SecurityException(MISSING_HEADER);
             }
-
-            String subject = jwtTokenProvider.getUsernameFromToken(token);
-
-            if (!serviceName.equals(subject)) {
-                throw new SecurityException(UNAUTHORIZED_MESSAGE + subject);
-            }
-
-            workloadService.processTrainerEvent(dto);
-        } else {
-            throw new SecurityException(MISSING_HEADER);
+        } finally {
+            MDC.clear();
         }
     }
 }
