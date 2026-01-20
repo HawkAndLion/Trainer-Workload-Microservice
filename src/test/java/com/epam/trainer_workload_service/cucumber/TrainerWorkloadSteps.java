@@ -3,8 +3,8 @@ package com.epam.trainer_workload_service.cucumber;
 import com.epam.trainer_workload_service.dto.ActionType;
 import com.epam.trainer_workload_service.dto.TrainingEventDto;
 import com.epam.trainer_workload_service.model.TrainingSummaryResponseDto;
-import com.epam.trainer_workload_service.mongo.TrainerWorkloadDocument;
 import com.epam.trainer_workload_service.repository.TrainerWorkloadRepository;
+import com.epam.trainer_workload_service.repository.TrainingEventRecordRepository;
 import com.epam.trainer_workload_service.service.ServiceException;
 import com.epam.trainer_workload_service.service.WorkloadService;
 import io.cucumber.java.Before;
@@ -14,7 +14,6 @@ import io.cucumber.java.en.When;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -26,6 +25,9 @@ public class TrainerWorkloadSteps {
     @Autowired
     private TrainerWorkloadRepository workloadRepository;
 
+    @Autowired
+    private TrainingEventRecordRepository eventRepository;
+
     private TrainingEventDto eventDto;
     private Exception exception;
     private TrainingSummaryResponseDto summary;
@@ -33,55 +35,20 @@ public class TrainerWorkloadSteps {
     @Before
     public void cleanDatabase() {
         workloadRepository.deleteAll();
+        eventRepository.deleteAll();
+        exception = null;
+        summary = null;
     }
+
 
     @Given("a trainer with username {string} and first name {string} and last name {string}")
     public void givenTrainer(String username, String firstName, String lastName) {
-        if (workloadRepository.findByUsername(username).isEmpty()) {
-            TrainerWorkloadDocument doc = new TrainerWorkloadDocument();
-            doc.setUsername(username);
-            doc.setFirstName(firstName);
-            doc.setLastName(lastName);
-            doc.setActive(true);
-            doc.setYears(new ArrayList<>());
-            workloadRepository.save(doc);
-        }
-
         eventDto = new TrainingEventDto();
         eventDto.setUsername(username);
         eventDto.setFirstName(firstName);
         eventDto.setLastName(lastName);
         eventDto.setActive(true);
-        eventDto.setTrainingDate(LocalDate.of(2025, 5, 1)); // Default date
-    }
-
-
-    @Given("no trainer exists with username {string}")
-    public void noTrainerExists(String username) {
-        workloadRepository.findByUsername(username).ifPresent(workloadRepository::delete);
-
-        eventDto = new TrainingEventDto();
-        eventDto.setUsername(username);
-        eventDto.setFirstName("Dummy");
-        eventDto.setLastName("Dummy");
-        eventDto.setActive(true);
         eventDto.setTrainingDate(LocalDate.of(2025, 5, 1));
-    }
-
-    @Given("a training event with ID {int} exists for trainer {string} in May {int} with duration {int}")
-    public void trainingEventExistsForTrainer(int id, String username, int year, int duration) {
-        eventDto = new TrainingEventDto();
-        eventDto.setTrainingId((long) id);
-        eventDto.setUsername(username);
-        eventDto.setTrainingDate(LocalDate.of(year, 5, 1));
-        eventDto.setDurationMinutes((long) duration);
-        eventDto.setActionType(ActionType.ADD);
-
-        try {
-            workloadService.processTrainerEvent(eventDto);
-        } catch (Exception ex) {
-            exception = ex;
-        }
     }
 
     @Given("a training event with ID {int} already exists")
@@ -146,6 +113,7 @@ public class TrainerWorkloadSteps {
         eventDto.setActionType(ActionType.DELETE);
     }
 
+    // ---------- WHEN STEPS ----------
     @When("a training event with ID {int} and duration {int} minutes is added")
     public void addTrainingEvent(int id, int duration) {
         eventDto.setTrainingId((long) id);
@@ -254,3 +222,5 @@ public class TrainerWorkloadSteps {
         assertNull(exception);
     }
 }
+
+
