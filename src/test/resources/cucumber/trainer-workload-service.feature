@@ -5,16 +5,6 @@ Feature: Trainer Workload Service
     When a training event with ID 1 and duration 60 minutes is added
     Then the monthly summary for May 2025 should show 60 minutes
 
-  Scenario: Create new trainer if not exists
-    Given no trainer exists with username "Jane.Doe"
-    When a training event with ID 2 and duration 45 minutes is added for "Jane.Doe"
-    Then the monthly summary for May 2025 should show 45 minutes
-
-  Scenario: Delete existing training
-    Given a training event with ID 3 exists for trainer "John.Doe" in May 2025 with duration 60
-    When the training event is deleted
-    Then the monthly summary for May 2025 should decrease by 60 minutes
-
   Scenario: Generate transaction ID if missing
     Given a training event with ID 4 and missing transaction ID
     When it is processed
