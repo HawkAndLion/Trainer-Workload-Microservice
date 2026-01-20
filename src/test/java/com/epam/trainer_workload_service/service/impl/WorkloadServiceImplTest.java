@@ -38,6 +38,7 @@ class WorkloadServiceImplTest {
     private static final String USERNAME = "John.Doe";
     private static final String FIRSTNAME = "John";
     private static final String LASTNAME = "Doe";
+    private static final String ERROR_MESSAGE = "Workload cannot be negative for user=John.Doe";
 
     @Mock
     private TrainerWorkloadRepository workloadRepository;
@@ -51,6 +52,47 @@ class WorkloadServiceImplTest {
     @InjectMocks
     private WorkloadServiceImpl service;
 
+    @Test
+    void shouldAddTrainingAndIncreaseWorkloadWhenNonDuplicate() {
+        // Given
+        TrainingEventDto dto = new TrainingEventDto();
+        dto.setUsername(USERNAME);
+        dto.setFirstName(FIRSTNAME);
+        dto.setLastName(LASTNAME);
+        dto.setActive(true);
+        dto.setTrainingDate(LocalDate.of(2025, 5, 15));
+        dto.setDurationMinutes(60L);
+        dto.setActionType(ActionType.ADD);
+
+        MonthWorkload month = new MonthWorkload();
+        month.setMonth(5);
+        month.setTotalMinutes(60L);
+        List<MonthWorkload> months = new ArrayList<>();
+        months.add(month);
+
+        YearWorkload year = new YearWorkload();
+        year.setYear(2025);
+        year.setMonths(months);
+        List<YearWorkload> years = new ArrayList<>();
+        years.add(year);
+
+        TrainerWorkloadDocument workloadDocument = new TrainerWorkloadDocument();
+        workloadDocument.setUsername(USERNAME);
+        workloadDocument.setFirstName(FIRSTNAME);
+        workloadDocument.setLastName(LASTNAME);
+        workloadDocument.setActive(true);
+        workloadDocument.setYears(years);
+
+        when(eventRepository.existsByTrainingId(dto.getTrainingId())).thenReturn(false);
+        when(workloadRepository.findByUsername(USERNAME)).thenReturn(Optional.of(workloadDocument));
+
+        // When
+        service.processTrainerEvent(dto);
+
+        // Then
+        verify(eventRepository).save(any());
+        verify(workloadRepository).save(any());
+    }
 
     @Test
     void shouldDoNothingWhenProcessTrainerEventIsDuplicateAdd() {
@@ -76,6 +118,100 @@ class WorkloadServiceImplTest {
         verify(eventRepository, never()).save(any());
         verify(workloadRepository, never()).save(any());
         assertDoesNotThrow(() -> service.processTrainerEvent(dto));
+    }
+
+
+    @Test
+    void shouldCreateNewTrainerWhenNotExists() {
+        // Given
+        TrainingEventDto dto = new TrainingEventDto();
+        dto.setUsername(USERNAME);
+        dto.setFirstName(FIRSTNAME);
+        dto.setLastName(LASTNAME);
+        dto.setActive(true);
+        dto.setTrainingDate(LocalDate.of(2025, 5, 15));
+        dto.setDurationMinutes(60L);
+        dto.setActionType(ActionType.ADD);
+
+        when(eventRepository.existsByTrainingId(dto.getTrainingId())).thenReturn(false);
+        when(workloadRepository.findByUsername(USERNAME)).thenReturn(Optional.empty());
+
+        // When
+        service.processTrainerEvent(dto);
+
+        // Then
+        verify(workloadRepository).save(any(TrainerWorkloadDocument.class));
+    }
+
+    @Test
+    void shouldCreateNewYearWhenMissing() {
+        // Given
+        TrainingEventDto dto = new TrainingEventDto();
+        dto.setUsername(USERNAME);
+        dto.setFirstName(FIRSTNAME);
+        dto.setLastName(LASTNAME);
+        dto.setActive(true);
+        dto.setTrainingDate(LocalDate.of(2025, 5, 15));
+        dto.setDurationMinutes(60L);
+        dto.setActionType(ActionType.ADD);
+
+        List<YearWorkload> emptyList = new ArrayList<>();
+
+        TrainerWorkloadDocument workloadDocument = new TrainerWorkloadDocument();
+        workloadDocument.setUsername(USERNAME);
+        workloadDocument.setFirstName(FIRSTNAME);
+        workloadDocument.setLastName(LASTNAME);
+        workloadDocument.setActive(true);
+        workloadDocument.setYears(emptyList);
+
+        when(workloadRepository.findByUsername(USERNAME)).thenReturn(Optional.of(workloadDocument));
+        when(eventRepository.existsByTrainingId(any())).thenReturn(false);
+
+        // When
+        service.processTrainerEvent(dto);
+
+        // Then
+        verify(workloadRepository).findByUsername(USERNAME);
+        assertEquals(1, workloadDocument.getYears().size());
+    }
+
+    @Test
+    void shouldCreateNewMonthWhenMissing() {
+        // Given
+        TrainingEventDto dto = new TrainingEventDto();
+        dto.setUsername(USERNAME);
+        dto.setFirstName(FIRSTNAME);
+        dto.setLastName(LASTNAME);
+        dto.setActive(true);
+        dto.setTrainingDate(LocalDate.of(2025, 5, 15));
+        dto.setDurationMinutes(60L);
+        dto.setActionType(ActionType.ADD);
+
+        List<MonthWorkload> emptyList = new ArrayList<>();
+
+        YearWorkload year = new YearWorkload();
+        year.setYear(2025);
+        year.setMonths(emptyList);
+        List<YearWorkload> years = new ArrayList<>();
+        years.add(year);
+
+        TrainerWorkloadDocument workloadDocument = new TrainerWorkloadDocument();
+        workloadDocument.setUsername(USERNAME);
+        workloadDocument.setFirstName(FIRSTNAME);
+        workloadDocument.setLastName(LASTNAME);
+        workloadDocument.setActive(true);
+        workloadDocument.setYears(years);
+
+        when(workloadRepository.findByUsername(USERNAME)).thenReturn(Optional.of(workloadDocument));
+        when(eventRepository.existsByTrainingId(any())).thenReturn(false);
+
+        // When
+        service.processTrainerEvent(dto);
+
+        // Then
+        verify(workloadRepository).findByUsername(USERNAME);
+        verify(eventRepository).existsByTrainingId(any());
+        assertEquals(1, workloadDocument.getYears().get(0).getMonths().size());
     }
 
     @Test
@@ -413,7 +549,7 @@ class WorkloadServiceImplTest {
 
 
     @Test
-    void getSummaryForTrainer_noRecords_returnsEmpty() throws ServiceException {
+    void shouldReturnEmptyWhenNoRecords() throws ServiceException {
         // Given
         MonthWorkload month = new MonthWorkload();
         month.setMonth(1);
@@ -475,5 +611,54 @@ class WorkloadServiceImplTest {
         // Then
         verifyNoInteractions(workloadRepository);
         assertTrue(ex.getMessage().contains(NULL_USERNAME));
+    }
+
+    @Test
+    void shouldThrowExceptionWhenWorkloadBecomesNegative() {
+        // Given
+        TrainingEventDto dto = new TrainingEventDto();
+        dto.setUsername(USERNAME);
+        dto.setFirstName(FIRSTNAME);
+        dto.setLastName(LASTNAME);
+        dto.setActive(true);
+        dto.setTrainingDate(LocalDate.of(2024, 1, 15));
+        dto.setDurationMinutes(90L);
+        dto.setActionType(ActionType.DELETE);
+
+        MonthWorkload month = new MonthWorkload();
+        month.setMonth(1);
+        month.setTotalMinutes(90L);
+        List<MonthWorkload> months = new ArrayList<>();
+        months.add(month);
+
+        YearWorkload year = new YearWorkload();
+        year.setYear(2025);
+        year.setMonths(months);
+        List<YearWorkload> years = new ArrayList<>();
+        years.add(year);
+
+        TrainerWorkloadDocument workloadDocument = new TrainerWorkloadDocument();
+        workloadDocument.setUsername(USERNAME);
+        workloadDocument.setFirstName(FIRSTNAME);
+        workloadDocument.setLastName(LASTNAME);
+        workloadDocument.setActive(true);
+        workloadDocument.setYears(years);
+
+        TrainingEventRecord record =
+                new TrainingEventRecord(1L, USERNAME, LocalDate.of(2025, 1, 15), 90);
+
+        when(eventRepository.findByTrainingId(any())).thenReturn(Optional.of(record));
+        when(workloadRepository.findByUsername(USERNAME)).thenReturn(Optional.of(workloadDocument));
+
+        // When
+        IllegalStateException exception = assertThrows(IllegalStateException.class,
+                () -> service.processTrainerEvent(dto));
+
+        // Then
+        verify(eventRepository, times(1))
+                .findByTrainingId(any());
+        verify(workloadRepository, never()).save(any());
+
+        assertEquals(ERROR_MESSAGE, exception.getMessage());
     }
 }

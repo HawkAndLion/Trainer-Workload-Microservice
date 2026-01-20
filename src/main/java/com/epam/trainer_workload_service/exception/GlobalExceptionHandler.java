@@ -37,6 +37,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ServiceException.class)
     public ResponseEntity<Object> handleServiceException(ServiceException ex) {
         String tx = MDC.get(TRANSACTION_ID);
+        if (tx == null) tx = "N/A";
 
         log.warn("Service exception. transactionId={}, message={}", tx, ex.getMessage());
 
